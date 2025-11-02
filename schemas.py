@@ -1,48 +1,44 @@
 """
-Database Schemas
+Database Schemas for FluxMarket (Classifieds)
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
-
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Each Pydantic model maps to a MongoDB collection (lowercased class name).
+Use these for validation and to keep collections consistent.
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
+from typing import List, Optional, Literal
+from pydantic import BaseModel, Field, HttpUrl, EmailStr
 
-# Example schemas (replace with your own):
-
+# Users who can post, message, and save listings
 class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
     name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
+    email: EmailStr = Field(..., description="Email address")
+    password_hash: str = Field(..., description="SHA-256 hash of password")
+    avatar_url: Optional[HttpUrl] = Field(None, description="Profile avatar URL")
+    location: Optional[str] = Field(None, description="City or region")
     is_active: bool = Field(True, description="Whether user is active")
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+# Items or services for sale or hire
+class Listing(BaseModel):
+    user_id: str = Field(..., description="Owner user id")
+    title: str = Field(..., max_length=140)
+    description: str = Field(..., max_length=5000)
+    price: float = Field(..., ge=0)
+    category: str = Field(..., description="Category name")
+    listing_type: Literal['sale', 'service', 'rent'] = Field('sale')
+    location: Optional[str] = None
+    images: List[HttpUrl] = Field(default_factory=list)
+    status: Literal['active', 'sold', 'paused'] = Field('active')
 
-# Add your own schemas here:
-# --------------------------------------------------
+# Direct messages between buyer and seller tied to a listing
+class Message(BaseModel):
+    listing_id: str
+    from_user_id: str
+    to_user_id: str
+    content: str = Field(..., max_length=5000)
+    read: bool = Field(False)
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+# Saved/favorited listings per user
+class Saved(BaseModel):
+    user_id: str
+    listing_id: str
+
